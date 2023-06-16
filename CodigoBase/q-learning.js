@@ -1,9 +1,4 @@
 
-const numStates = 3; // Número de estados possíveis (cima, baixo, esquerda)
-const numActions = 3; // Número de ações possíveis (cima, baixo, esquerda)
-const learningRate = 0.1; // Taxa de aprendizado
-const discountRate = 0.99; // Taxa de desconto
-const numEpisodes = 1000; // Número de episódios de treinamento
 
 
 
