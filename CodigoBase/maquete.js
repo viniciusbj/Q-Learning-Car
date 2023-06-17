@@ -1,5 +1,5 @@
-import * as THREE 	from 'three';
-import { GLTFLoader } from '../../Assets/scripts/three.js/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.121.1/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/loaders/GLTFLoader.js";
 
 const 	rendSize 	= new THREE.Vector2();
 var container;
@@ -11,8 +11,9 @@ var 	scene,
 var gridSize = { x: 13, y: 4 }; // Tamanho da grade da pista (10x5)
 //var carColor = 0x00ff00; // Cor do carro
 var learningRate = 0.5; // Taxa de aprendizado
-var discountFactor = 0.5; // Fator de desconto
-var explorationRate = 0.8; // Taxa de exploração
+var discountFactor = 1.0; // Fator de desconto
+var explorationRate = 0.2; // Taxa de exploração
+var explorationRate_decay = 0.98;
 var qTable = [];
 var carMesh;
 var track;
@@ -134,7 +135,7 @@ function updateCarPosition(pos) {
 
   renderer.setAnimationLoop( function () {
 
-      carteste.position.set(pos.x, pos.y, 0);
+      carteste.position.set(pos.x,  - pos.y, 0);
 
     renderer.render( scene, camera );
   } );
@@ -149,6 +150,7 @@ function chooseAction(position) {
     // Exploração: escolhe uma ação aleatória
     var actions = Object.keys(qTable[position.x][position.y]);
     var randomIndex = Math.floor(Math.random() * actions.length);
+
     return actions[randomIndex];
   } else {
     // Exploração: escolhe a ação com maior valor Q
@@ -163,7 +165,6 @@ function chooseAction(position) {
         bestAction = action;
       }
     });
-    console.log("best action",bestAction );
     return bestAction;
   }
 }
@@ -171,19 +172,18 @@ function chooseAction(position) {
 
 // Função para atualizar a tabela Q com base na transição de estado
 function updateQTable(position, action, reward, nextPosition) {
-  const currentQ = qTable[position.x][position.y][action];
-  const maxNextQ = Math.max(...Object.values(qTable[nextPosition.x][nextPosition.y]));
-
+  var currentQ = qTable[position.x][position.y][action];
+  var maxNextQ = Math.max(...Object.values(qTable[nextPosition.x][nextPosition.y]));
+  
   var updatedQ = (1 - learningRate) * currentQ + learningRate * (reward + discountFactor * maxNextQ);
   qTable[position.x][position.y][action] = updatedQ;
-
 }
 function resetCar(){
   carteste.position.set(0,0,0);
 }
 // Função para treinar o agente usando o algoritmo Q-learning
 function train() {
-  const numEpisodes = 40; // Número de episódios de treinamento
+  const numEpisodes = 60; // Número de episódios de treinamento
 
   for (let episode = 0; episode < numEpisodes; episode++) {
     let currentPosition = { x: 0, y: 0 }; // Posição inicial do carro
@@ -191,7 +191,7 @@ function train() {
 
     while (currentPosition.x < 12 ) {
       var action = chooseAction(currentPosition);
-      console.log("acao esbolhido:", action);
+
       let nextPosition = { x: currentPosition.x, y: currentPosition.y };
 
       if (action === 'right' && currentPosition.x >= 0) {
@@ -201,28 +201,26 @@ function train() {
       } else if (action === 'down' && currentPosition.y < gridSize.y - 1) {
         nextPosition.y++;
       }
-
-     
-      var reward = isHole(nextPosition.x, nextPosition.y) ? -1 : 1;
-      if(currentPosition.y == 0 && action === 'up'){
+      var reward = isHole(nextPosition.x, nextPosition.y) ? -10 : 1;
+      if((currentPosition.y == 0 && action === 'up' ) || (currentPosition.y == 3 && action === 'down') ){
         reward -= 10;
       }
-      console.log("position:  ",currentPosition);
-      console.log("reward ",reward);
+    
       updateQTable(currentPosition, action, reward, nextPosition);
 
       currentPosition = nextPosition;
     }
+    explorationRate *= explorationRate_decay;
   }
   console.log(qTable);
-  runAgent();
+ // runAgent();
 }
 
 // Função para executar o agente treinado e animar o carro na pista
 function runAgent() {
   let currentPosition = { x: 0, y: 0 }; // Posição inicial do carro
 
-  while(currentPosition.x < 2){
+  while(true){
 
     var actions = Object.keys(qTable[currentPosition.x][currentPosition.y]);
     console.log(actions);
@@ -242,15 +240,19 @@ function runAgent() {
     if (bestAction === 'right' && currentPosition.x >= 0) {
       nextPosition.x++;
     } else if (bestAction === 'up' && currentPosition.y > 0) {
-      nextPosition.y++;
-    } else if (bestAction === 'down' && currentPosition.y < gridSize.y - 1) {
       nextPosition.y--;
+    } else if (bestAction === 'down' && currentPosition.y < gridSize.y) {
+      nextPosition.y++;
     }
+      console.log("posicao atual", currentPosition);
       currentPosition = nextPosition;
-
+      console.log("proxima posicao", currentPosition);
       // Atualiza a posição do carro
     updateCarPosition(currentPosition);
-    console.log("proxima posicao", currentPosition);
+    
+    if(currentPosition.x == 2){
+      break;
+    }
   }
 
 }
