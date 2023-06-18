@@ -1,5 +1,6 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.121.1/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/loaders/GLTFLoader.js";
+import  {OrbitControls}  from '../../Models/OrbitControls.js';
 
 const 	rendSize 	= new THREE.Vector2();
 var container;
@@ -8,7 +9,7 @@ var 	scene,
 		renderer,
 		camera;
 var gridSize = { x: 13, y: 4 }; // Tamanho da grade da pista (10x5)
-//var carColor = 0x00ff00; // Cor do carro
+
 var learningRate = 0.5; // Taxa de aprendizado
 var discountFactor = 1.0; // Fator de desconto
 var explorationRate = 0.2; // Taxa de exploração
@@ -18,7 +19,7 @@ var carMesh;
 var track;
 var car, buraco;
 var carteste;
-var texture;
+var texture, textureRoad, controlOrbit;
 var path = [];
 var box;
 var trackAux = [];
@@ -35,51 +36,55 @@ function main() {
 	container.appendChild( renderer.domElement );
 
 	scene 	= new THREE.Scene();
-	camera = new THREE.PerspectiveCamera(50, rendSize.x / rendSize.y, 10.0, 2000);
-	camera.position.set(6, 0, 15);
+	camera = new THREE.PerspectiveCamera(50, rendSize.x / rendSize.y, 1.0, 2000);
+	camera.position.set(6,5, 18);
+
+
 
   texture 		= new THREE.TextureLoader().load("../../Models/hole2.png");
+  textureRoad 		= new THREE.TextureLoader().load("../../Models/ativo.png");
   const trackGeometry = new THREE.PlaneGeometry(gridSize.x, gridSize.y + 1.0);
-	const trackMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+	const trackMaterial = new THREE.MeshBasicMaterial({ map:textureRoad });
 	const track2 = new THREE.Mesh(trackGeometry, trackMaterial);
 	scene.add(track2);
   track2.position.x += 6;
   track2.position.y -= 2;
+  track2.position.z = 1.9;
 
+  camera.updateProjectionMatrix();
+  scene.rotation.y = 0.0;
+
+  scene.rotation.x = -Math.PI/ 3 ;
+  scene.rotation.z = 0.4;
 	// criação dos buracos
-  var buracos = [];
-	const obstacleGeometry = new THREE.PlaneGeometry(0.3, 0.3);
+  var holes = [];
+	const obstacleGeometry = new THREE.PlaneGeometry(0.8, 0.8);
 	const obstacleGeometryMaterial = new THREE.MeshBasicMaterial( { map:texture,
                                                                   transparent: true } );
-	buracos[0] = new THREE.Mesh(obstacleGeometry, obstacleGeometryMaterial);
-	buracos[0].position.set(4,0,0);
+	holes[0] = new THREE.Mesh(obstacleGeometry, obstacleGeometryMaterial);
+	holes[0].position.set(4,0,2);
 
-  buracos[1] = buracos[0].clone();
-	buracos[1].position.set(4,-1,0);
+  holes[1] = holes[0].clone();
+	holes[1].position.set(4,-1,2);
 
-  buracos[3] = buracos[0].clone();
-	buracos[3].position.set(7,0,0);
+  holes[2] = holes[0].clone();
+	holes[2].position.set(7,0,2);
 
-  buracos[4] = buracos[0].clone();
-	buracos[4].position.set(9,-1,0);
+  holes[3] = holes[0].clone();
+	holes[3].position.set(9,-1,2);
 
-  buracos[5] = buracos[0].clone();
-	buracos[5].position.set(9,-2,0);
+  holes[4] = holes[0].clone();
+	holes[4].position.set(9,-2,2);
 
-  buracos[6] = buracos[0].clone();
-	buracos[6].position.set(11,-3,0);
-
-  buracos.forEach(item =>{
+  holes[5] = holes[0].clone();
+	holes[5].position.set(11,-3,2);
+  holes.forEach(item =>{
     scene.add(item);
+
   });
 
-
 	initLights();
-  //loader.load('../Models/suv.glb', loadCar);
-
-	carteste = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), new THREE.MeshBasicMaterial({ color: 0xFFFF }));
-	carteste.position.set(0,0,0);
-	scene.add(carteste);
+  loader.load('../Models/suv.glb', loadCar);
 
   track = [
     [1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1],
@@ -111,15 +116,14 @@ function loadCar(loadedCar){
 			o.material.side = THREE.DoubleSide;
 		} 
 	  });
-	car.position.set(0,0,0);
+  resetCar();
 	car.rotation.x = Math.PI / 2;
 	car.rotation.y = -Math.PI/2;
   car.scale.set(0.5,0.5,0.3);
-	//scene.add(car);
+  car.position.z = 2;
+	scene.add(car);
 	box = new THREE.Box3().setFromObject(car);
-
-	//renderExternal();
-
+  renderer.render(scene, camera);
 }
 
 function initLights(){
@@ -137,10 +141,7 @@ hemiLight.color.setHSL( 0.6, 1, 0.6 );
 hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
 hemiLight.position.set( 0, 50, 0 );
 scene.add( hemiLight );
-
-
 }
-
 // Função para verificar se uma célula contém um buraco
 function isHole(x, y) {
 
@@ -152,14 +153,6 @@ function isHole(x, y) {
     return false;
   }
 }
-function itsOut(x,y){
-  if(x < 0 || y <0){
-    return true;
-  }else{
-    return false;
-  }
-}
-  
 // Função para escolher uma ação com base nos valores Q e na taxa de exploração
 function chooseAction(position) {
   if (Math.random() < explorationRate) {
@@ -184,8 +177,6 @@ function chooseAction(position) {
     return bestAction;
   }
 }
-
-
 // Função para atualizar a tabela Q com base na transição de estado
 function updateQTable(position, action, reward, nextPosition) {
   var currentQ = qTable[position.x][position.y][action];
@@ -195,7 +186,8 @@ function updateQTable(position, action, reward, nextPosition) {
   qTable[position.x][position.y][action] = updatedQ;
 }
 function resetCar(){
-  carteste.position.set(0,0,0);
+  car.position.set(0,0,0);
+  renderer.render(scene, camera);
 }
 
 function resetMatrix(){
@@ -213,7 +205,6 @@ function train() {
   for (let episode = 0; episode < numEpisodes; episode++) {
     resetMatrix();
     let currentPosition = { x: 0, y: 0 }; // Posição inicial do carro
-    resetCar();
 
     while (currentPosition.x <= 12 ) {
       var action = chooseAction(currentPosition);
@@ -298,23 +289,17 @@ train();
 function animateCar() {
 
   var i=0;
-  const velocidade = 0.01;
-    var id = setInterval(function() {
+    var id = setInterval(function() { 
 
-      
-     carteste.position.set(path[i].x, - path[i].y, 0);
-      i++;
-     
-
-      if(path[i].x == 12)
-      {
-        carteste.position.set(path[i].x, - path[i].y, 0);
+      if(path[i].x <= 11){
+        car.position.set(path[i].x, - path[i].y, 2);
+        i++;
+      }else{
+        car.position.set(path[i].x, - path[i].y, 2);
         clearInterval(id);
       }
       renderer.render(scene, camera);
     }, 180);
-
-
 
 }
 //********************************** */
