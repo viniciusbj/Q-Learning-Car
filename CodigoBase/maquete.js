@@ -7,7 +7,6 @@ const loader = new GLTFLoader();
 var 	scene,
 		renderer,
 		camera;
-
 var gridSize = { x: 13, y: 4 }; // Tamanho da grade da pista (10x5)
 //var carColor = 0x00ff00; // Cor do carro
 var learningRate = 0.5; // Taxa de aprendizado
@@ -19,7 +18,10 @@ var carMesh;
 var track;
 var car, buraco;
 var carteste;
+var texture;
+var path = [];
 var box;
+var trackAux = [];
 function main() {
 
 	renderer = new THREE.WebGLRenderer({ antialias: true } );
@@ -36,6 +38,7 @@ function main() {
 	camera = new THREE.PerspectiveCamera(50, rendSize.x / rendSize.y, 10.0, 2000);
 	camera.position.set(6, 0, 15);
 
+  texture 		= new THREE.TextureLoader().load("../../Models/hole2.png");
   const trackGeometry = new THREE.PlaneGeometry(gridSize.x, gridSize.y + 1.0);
 	const trackMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
 	const track2 = new THREE.Mesh(trackGeometry, trackMaterial);
@@ -44,11 +47,32 @@ function main() {
   track2.position.y -= 2;
 
 	// criação dos buracos
+  var buracos = [];
 	const obstacleGeometry = new THREE.PlaneGeometry(0.3, 0.3);
-	const obstacleGeometryMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFF });
-	buraco = new THREE.Mesh(obstacleGeometry, obstacleGeometryMaterial);
-	buraco.position.set(4,0,0);
-	scene.add(buraco);
+	const obstacleGeometryMaterial = new THREE.MeshBasicMaterial( { map:texture,
+                                                                  transparent: true } );
+	buracos[0] = new THREE.Mesh(obstacleGeometry, obstacleGeometryMaterial);
+	buracos[0].position.set(4,0,0);
+
+  buracos[1] = buracos[0].clone();
+	buracos[1].position.set(4,-1,0);
+
+  buracos[3] = buracos[0].clone();
+	buracos[3].position.set(7,0,0);
+
+  buracos[4] = buracos[0].clone();
+	buracos[4].position.set(9,-1,0);
+
+  buracos[5] = buracos[0].clone();
+	buracos[5].position.set(9,-2,0);
+
+  buracos[6] = buracos[0].clone();
+	buracos[6].position.set(11,-3,0);
+
+  buracos.forEach(item =>{
+    scene.add(item);
+  });
+
 
 	initLights();
   //loader.load('../Models/suv.glb', loadCar);
@@ -58,12 +82,19 @@ function main() {
 	scene.add(carteste);
 
   track = [
-    [1, 1, 1, 1, 0, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    [1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1],
+    [1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1]
   ];
-  
+
+  trackAux = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  ];
+
   // Definir a tabela Q inicializada com zeros
   for (let x = 0; x < gridSize.x; x++) {
     qTable[x] = [];
@@ -72,7 +103,6 @@ function main() {
     }
   }
   renderer.render(scene, camera);
-//  renderExternal();
 }
 function loadCar(loadedCar){
 	car = loadedCar.scene;
@@ -130,20 +160,6 @@ function itsOut(x,y){
   }
 }
   
-// Função para atualizar a posição do carro na cena
-function updateCarPosition(pos) {
-
-  renderer.setAnimationLoop( function () {
-
-      carteste.position.set(pos.x,  - pos.y, 0);
-
-    renderer.render( scene, camera );
-  } );
-
-//  renderer.render(scene, camera);
- // camera.updateProjectionMatrix();
-}
-
 // Função para escolher uma ação com base nos valores Q e na taxa de exploração
 function chooseAction(position) {
   if (Math.random() < explorationRate) {
@@ -181,19 +197,28 @@ function updateQTable(position, action, reward, nextPosition) {
 function resetCar(){
   carteste.position.set(0,0,0);
 }
+
+function resetMatrix(){
+  for (var i = 0; i < 13; i++) {
+    for (var j = 0; j < 4; j++) {
+
+      trackAux[j][i] = 0;
+    }
+  }
+}
 // Função para treinar o agente usando o algoritmo Q-learning
 function train() {
-  const numEpisodes = 60; // Número de episódios de treinamento
+  const numEpisodes = 15; // Número de episódios de treinamento
 
   for (let episode = 0; episode < numEpisodes; episode++) {
+    resetMatrix();
     let currentPosition = { x: 0, y: 0 }; // Posição inicial do carro
     resetCar();
 
-    while (currentPosition.x < 12 ) {
+    while (currentPosition.x <= 12 ) {
       var action = chooseAction(currentPosition);
-
       let nextPosition = { x: currentPosition.x, y: currentPosition.y };
-
+      trackAux[currentPosition.y][currentPosition.x] = 1;
       if (action === 'right' && currentPosition.x >= 0) {
         nextPosition.x++;
       } else if (action === 'up' && currentPosition.y > 0) {
@@ -201,19 +226,29 @@ function train() {
       } else if (action === 'down' && currentPosition.y < gridSize.y - 1) {
         nextPosition.y++;
       }
-      var reward = isHole(nextPosition.x, nextPosition.y) ? -10 : 1;
-      if((currentPosition.y == 0 && action === 'up' ) || (currentPosition.y == 3 && action === 'down') ){
+      
+      var reward = isHole(nextPosition.x, nextPosition.y) ? -10 : 1; // Recompensa negativa se estiver buraco, se não recompensa = 1
+      if((nextPosition.x == 13 && action === 'right') ){
+        reward += 10;
+        nextPosition = {x:0, y:0};
+        updateQTable(currentPosition, action, reward,nextPosition );
+        break;
+      }
+      if((currentPosition.y == 0 && action === 'up' ) || (currentPosition.y == 3 && action === 'down') ){ // recompensa negativa se a ação atual faz o agente sair da pista
         reward -= 10;
       }
-    
+      if(trackAux[nextPosition.y][nextPosition.x] == 1){ //Recompensa negativa se já visitou essa opção
+        reward -= 10;
+      }
+      
       updateQTable(currentPosition, action, reward, nextPosition);
 
       currentPosition = nextPosition;
     }
     explorationRate *= explorationRate_decay;
   }
-  console.log(qTable);
- // runAgent();
+  console.log("Tabela Q treinada: ", qTable);
+  runAgent();
 }
 
 // Função para executar o agente treinado e animar o carro na pista
@@ -223,7 +258,6 @@ function runAgent() {
   while(true){
 
     var actions = Object.keys(qTable[currentPosition.x][currentPosition.y]);
-    console.log(actions);
     let maxQ = -Infinity;
     let bestAction = actions[0];
 
@@ -234,7 +268,6 @@ function runAgent() {
         bestAction = action;
       }
     });
-    console.log(bestAction);
     let nextPosition = { x: currentPosition.x, y: currentPosition.y };
 
     if (bestAction === 'right' && currentPosition.x >= 0) {
@@ -244,13 +277,14 @@ function runAgent() {
     } else if (bestAction === 'down' && currentPosition.y < gridSize.y) {
       nextPosition.y++;
     }
-      console.log("posicao atual", currentPosition);
-      currentPosition = nextPosition;
-      console.log("proxima posicao", currentPosition);
-      // Atualiza a posição do carro
-    updateCarPosition(currentPosition);
+    path.push(currentPosition);
+    currentPosition = nextPosition;
+
+   // updateCarPosition(currentPosition);
     
-    if(currentPosition.x == 2){
+    if(currentPosition.x == 13){
+      console.log("Caminho percorrido (já treinado): ", path);
+      animateCar(path);
       break;
     }
   }
@@ -260,14 +294,27 @@ main();
 // Iniciar o treinamento
 train();
 
-// Executar o agente treinado
+
+function animateCar() {
+
+  var i=0;
+  const velocidade = 0.01;
+    var id = setInterval(function() {
+
+      
+     carteste.position.set(path[i].x, - path[i].y, 0);
+      i++;
+     
+
+      if(path[i].x == 12)
+      {
+        carteste.position.set(path[i].x, - path[i].y, 0);
+        clearInterval(id);
+      }
+      renderer.render(scene, camera);
+    }, 180);
 
 
 
-function renderExternal() {
-
- // car.position.x += 0.001;
-  renderer.render(scene, camera);
-  requestAnimationFrame(renderExternal);
 }
-
+//********************************** */
