@@ -1,6 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.121.1/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/loaders/GLTFLoader.js";
-import  {OrbitControls}  from '../../Models/OrbitControls.js';
 
 const 	rendSize 	= new THREE.Vector2();
 var container;
@@ -200,7 +199,7 @@ function resetMatrix(){
   }
 }
 // Função para treinar o agente usando o algoritmo Q-learning
-function train() {
+async function train() {
   let counter = 0;
   const numEpisodes = 100; // Número de episódios de treinamento
 
@@ -245,6 +244,7 @@ function train() {
       
     }
     explorationRate -= epsilon_decay;
+    // if (episode%10 == 0) runAgent();
   }
   console.log("Tabela Q treinada: ", qTable);
   runAgent();
@@ -297,18 +297,19 @@ train();
 function animateCar() {
 
   var i=0;
-    var id = setInterval(function() { 
+  var id = setInterval(function() { 
 
-      if(path[i].x <= 12){
-          console.log("animation: ",path[i].x );
-        car.position.set(path[i].x, - path[i].y, 2);
-        i++;
-      }else{
-        car.position.set(path[i].x, - path[i].y, 2);
-        clearInterval(id);
-      }
-      renderer.render(scene, camera);
-    }, 180);
+    if(path[i].x <= 12){
+        console.log("animation: ",path[i].x );
+      car.position.set(path[i].x, - path[i].y, 2);
+      i++;
+    }else{
+      car.position.set(path[i].x, - path[i].y, 2);
+      clearInterval(id);
+    }
+    renderer.render(scene, camera);
+  }, 180);
+
 
 }
 //********************************** */
